@@ -134,13 +134,17 @@ class NL_GLE_sims():
                 self.save_fe()
 
     
-    def memory_function(self, x, t):
+    def memory(self, x, t):
         funcs = [dalpha1_dx, dalpha2_dx]
         taus = 2 * self.masses[1:] / self.gammas[1:]
         nus = np.sqrt(2 * self.coupling_ks * taus / self.gammas[1:] - 1)
-        ft = (self.coupling_ks * np.exp(-t / taus) * (np.cos(nus * t / taus)
-         + np.sin(nus * t / taus) / nus) / self.masses[0])
+        ft =  (self.coupling_ks * np.exp(-t / taus) * (np.cos(nus * t / taus)
+                + np.sin(nus * t / taus) / nus) / self.masses[0])
         memory = 0.
         for index, func in enumerate(funcs):
             memory += func(x, self.alphas[index]) ** 2 * ft[index]
         return memory 
+
+    def memory_function(self, x, t):
+        memory_vec = np.vectorize(self.memory)
+        return(memory_vec(x,t))
