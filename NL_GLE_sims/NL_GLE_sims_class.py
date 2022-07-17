@@ -34,7 +34,7 @@ class NL_GLE_sims():
         self.coupling_ks = coupling_ks
         self.alphas = alphas
         self.kT=kT
-        self.U0 = self.U0 * self.kT
+        self.U0 = U0 * self.kT
         self.nbins = nbins
         self.hist_range = hist_range
         self.plot = plot
@@ -89,9 +89,10 @@ class NL_GLE_sims():
         self.fe_sim = -self.kT * np.log(self.histogram)
         self.fe_sim -= np.min(self.fe_sim)
 
+
     def plot_fe(self):
         plt.plot(self.fe_pos, self.fe_sim / self.kT, label = 'PMF from sim.')
-        plt.plot(self.fe_pos, force_PMF(self.fe_pos, self.U0) / self.kT, label = 'PMF from input')
+        plt.plot(self.fe_pos, PMF(self.fe_pos, self.U0) / self.kT, label = 'PMF from input')
         plt.ylim(ymax = 1.5 * self.U0 / self.kT)
         plt.ylabel('free energy [kT]')
         plt.xlabel('x')
@@ -118,7 +119,9 @@ class NL_GLE_sims():
                 self.coupling_ks,
                 self.alphas,
                 self.gammas, 
-                self.dt)
+                self.dt,
+                self.kT,
+                self.U0)
             self.compute_distribution()
             if self.save:
                 np.save(self.path_to_save + 'traj_'+str(trj), self.x)

@@ -3,6 +3,10 @@ from numba import njit
 from math import sqrt, exp, atan, pi
 
 @njit()
+def PMF(x, U0):
+    return U0 * (x ** 2 - 1) ** 2
+
+@njit()
 def force_PMF(x, U0):
     return -4 * U0 * (x ** 3 - x)
 
@@ -43,7 +47,7 @@ def force(x_vec, couplings, alphas, U0, nvars):
 
 
 @njit()
-def BAOAB_integrator(nsteps, x_vec, v_vec, masses, couplings, alphas, friction, dt, kT=2.494, U0=3):
+def BAOAB_integrator(nsteps, x_vec, v_vec, masses, couplings, alphas, friction, dt, kT, U0):
     """Langevin integrator for initial value problems
     This function implements the BAOAB algorithm of Benedict Leimkuhler
     and Charles Matthews. See J. Chem. Phys. 138, 174102 (2013) for
@@ -61,7 +65,6 @@ def BAOAB_integrator(nsteps, x_vec, v_vec, masses, couplings, alphas, friction, 
         x (numpy.ndarray(nsteps + 1, n, d)): configuraiton trajectory
         v (numpy.ndarray(nsteps + 1, n, d)): velocity trajectory
     """
-    U0 *= kT
     nvars = len(x_vec)
     th = 0.5 * dt
     thm = np.zeros_like(x_vec)
@@ -82,11 +85,12 @@ def BAOAB_integrator(nsteps, x_vec, v_vec, masses, couplings, alphas, friction, 
         v[i] = v_vec[0]
 
         for nvar in range(nvars):
+            xi = np.random.normal(0., 1.)
             v_vec[nvar] += thm[nvar] * f[nvar]
-            x_vec[nvar] += th[nvar] * v_vec[nvar]
+            x_vec[nvar] += th * v_vec[nvar]
             v_vec[nvar] *= edt[nvar]
-            v_vec[nvar] += sqf[nvar] * np.random.randn()
-            x_vec[nvar] += th[nvar] * v_vec[nvar]
+            v_vec[nvar] += sqf[nvar] * xi
+            x_vec[nvar] += th * v_vec[nvar]
         f = force(x_vec, couplings, alphas, U0, nvars)
         for nvar in range(nvars):
             v_vec[nvar] += thm[nvar] * f[nvar]
