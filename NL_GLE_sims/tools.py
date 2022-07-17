@@ -1,6 +1,6 @@
 import numpy as np
 from numba import njit
-from math import sqrt, exp
+from math import sqrt, exp, atan, pi
 
 @njit()
 def force_PMF(x, U0):
@@ -8,19 +8,19 @@ def force_PMF(x, U0):
 
 @njit()
 def alpha1(x, alpha0):
-    return alpha0 * x
+    return alpha0 * atan(pi * (x - 0.5))
 
 @njit()
 def alpha2(x, alpha0):
-    return alpha0 * 0.5 * (5 * x ** 3 - 3 * x)
+    return alpha0 * atan(pi * (x + 0.5))
 
 @njit()
 def dalpha1_dx(x, alpha0):
-    return alpha0
+    return alpha0 * pi / (1 + (pi * (x - 0.5)) ** 2)
 
 @njit()
 def dalpha2_dx(x, alpha0):
-    return alpha0 * 1.5 * (5 * x ** 2 - 1) 
+    return alpha0 * pi / (1 + (pi * (x + 0.5)) ** 2)
 
 @njit()
 def force_couplingx(func, dfunc_dx, x, y, k0, alpha0):
@@ -43,8 +43,7 @@ def force(x_vec, couplings, alphas, U0, nvars):
 
 
 @njit()
-def BAOAB_integrator(force, nsteps, x_vec, v_vec, masses, couplings, alphas, friction, 
-dt, kT=2.494, U0=3):
+def BAOAB_integrator(nsteps, x_vec, v_vec, masses, couplings, alphas, friction, dt, kT=2.494, U0=3):
     """Langevin integrator for initial value problems
     This function implements the BAOAB algorithm of Benedict Leimkuhler
     and Charles Matthews. See J. Chem. Phys. 138, 174102 (2013) for
@@ -92,4 +91,4 @@ dt, kT=2.494, U0=3):
         for nvar in range(nvars):
             v_vec[nvar] += thm[nvar] * f[nvar]
 
-    return x, v
+    return x, v, x_vec, v_vec
