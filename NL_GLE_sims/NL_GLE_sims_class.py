@@ -109,6 +109,8 @@ class NL_GLE_sims():
         np.save(self.path_to_save + 'traj_fe', array)
 
     def print_vals(self):
+        print('epsilon = %.3g,   %.3g'%(np.sqrt(self.masses[1] / self.masses[0]), 
+                                        np.sqrt(self.masses[2] / self.masses[0])))
         mem_time = 2 * self.masses[1:] / self.gammas[1:]
         nu_sq = mem_time * self.coupling_ks / self.gammas[1:] - 1
         if any(nu_sq) < 0.:
