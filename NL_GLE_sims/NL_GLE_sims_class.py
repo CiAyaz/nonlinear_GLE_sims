@@ -22,9 +22,10 @@ class NL_GLE_sims():
         U0 = 3,
         nbins=100,
         hist_range = None,
-        plot=True,
-        save=False,
-        path_to_save='./'
+        plot = True,
+        save = False,
+        path_to_save = './',
+        integrator = 'leap_frog'
         ):
         self.dt = dt
         self.trj_len = traj_length
@@ -40,6 +41,7 @@ class NL_GLE_sims():
         self.plot = plot
         self.save = save
         self.path_to_save = path_to_save
+        self.integrator = integrator
 
     def parse_input(self):
         for input in [self.gammas, self.masses, self.coupling_ks, self.alphas]:
@@ -112,31 +114,51 @@ class NL_GLE_sims():
         if any(nu_sq) < 0.:
             print('nu_sq = ', nu_sq)
             raise ValueError('nu squared is negative!')
-        period = 2 * np.pi * mem_time / np.sqrt(nu_sq)
+        freq = np.sqrt(nu_sq) / (2 * np.pi * mem_time)
         print('memory times = %.3g,   %.3g'%(mem_time[0], mem_time[1]))
-        print('oscillation periods = %.3g,   %.3g'%(period[0], period[1]))
+        print('oscillation freq. = %.3g,   %.3g'%(freq[0], freq[1]))
 
     def NL_GLE_integrate(self):
         self.parse_input()
         self.gen_initial_values()
         self.print_vals()
-        print('Integrating using BAOAB scheme')
-        for trj in range(self.number_trjs):
-            self.x, self.v, self.x_vec, self.v_vec = BAOAB_integrator(
-                self.trj_len,
-                self.x_vec,
-                self.v_vec,
-                self.masses, 
-                self.coupling_ks,
-                self.alphas,
-                self.gammas, 
-                self.dt,
-                self.kT,
-                self.U0)
-            self.compute_distribution()
-            if self.save:
-                np.save(self.path_to_save + 'traj_'+str(trj), self.x)
-                np.save(self.path_to_save + 'vel_'+str(trj), self.v)
+        if self.integrator == 'BAOAB':
+            print('Integrating using BAOAB scheme')
+            for trj in range(self.number_trjs):
+                self.x, self.v, self.x_vec, self.v_vec = BAOAB_integrator(
+                    self.trj_len,
+                    self.x_vec,
+                    self.v_vec,
+                    self.masses, 
+                    self.coupling_ks,
+                    self.alphas,
+                    self.gammas, 
+                    self.dt,
+                    self.kT,
+                    self.U0)
+                self.compute_distribution()
+                if self.save:
+                    np.save(self.path_to_save + 'traj_'+str(trj), self.x)
+                    np.save(self.path_to_save + 'vel_'+str(trj), self.v)
+        else:
+            print('Integrating using leap-frog scheme')
+            for trj in range(self.number_trjs):
+                self.x, self.v, self.x_vec, self.v_vec = leapfrog_integrator(
+                    self.trj_len,
+                    self.x_vec,
+                    self.v_vec,
+                    self.masses, 
+                    self.coupling_ks,
+                    self.alphas,
+                    self.gammas, 
+                    self.dt,
+                    self.kT,
+                    self.U0)
+                self.compute_distribution()
+                if self.save:
+                    np.save(self.path_to_save + 'traj_'+str(trj), self.x)
+                    np.save(self.path_to_save + 'vel_'+str(trj), self.v)
+
 
         self.compute_free_energy()
         if self.plot:

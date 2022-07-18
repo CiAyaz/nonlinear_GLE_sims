@@ -96,3 +96,35 @@ def BAOAB_integrator(nsteps, x_vec, v_vec, masses, couplings, alphas, friction, 
             v_vec[nvar] += thm[nvar] * f[nvar]
 
     return x, v, x_vec, v_vec
+
+@njit()
+def leapfrog_integrator(nsteps, x_vec, v_vec, masses, couplings, alphas, friction, dt, kT, U0):
+    
+    nvars = len(x_vec)
+    th = 0.5 * dt
+    tm = np.zeros_like(x_vec)
+    tgm = np.zeros_like(x_vec)
+    xi_factor = np.zeros_like(x_vec)
+    for nvar in range(nvars):
+        tm[nvar] = dt / masses[nvar]
+        tgm[nvar] = - dt * friction[nvar] / masses[nvar]
+        xi_factor[nvar] = sqrt(2 * kT * friction[nvar] * dt) / masses[nvar]
+    
+    x=np.zeros(nsteps)
+    v=np.zeros(nsteps)
+
+    for i in range(nsteps):
+
+        x[i] = x_vec[0]
+        v[i] = v_vec[0]
+        
+        for nvar in range(nvars):
+            x_vec[nvar] += v_vec[nvar] * th
+        f = force(x_vec, couplings, alphas, U0, nvars)
+        for nvar in range(nvars):
+            xi = np.random.randn()
+            v_vec[nvar] += tgm[nvar] * v_vec[nvar]  
+            v_vec[nvar] += (tm[nvar] * f[nvar] + xi_factor[nvar] * xi)
+            x_vec[nvar] += th * v_vec[nvar]
+
+    return x, v, x_vec, v_vec
