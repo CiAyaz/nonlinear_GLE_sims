@@ -106,9 +106,20 @@ class NL_GLE_sims():
             axis = 1)
         np.save(self.path_to_save + 'traj_fe', array)
 
+    def print_vals(self):
+        mem_time = 2 * self.masses[1:] / self.gammas[1:]
+        nu_sq = mem_time * self.coupling_ks / self.gammas[1:] - 1
+        if any(nu_sq) < 0.:
+            print('nu_sq = ', nu_sq)
+            raise ValueError('nu squared is negative!')
+        period = 2 * np.pi * mem_time / np.sqrt(nu_sq)
+        print('memory times = %.3g,   %.3g'%(mem_time[0], mem_time[1]))
+        print('oscillation periods = %.3g,   %.3g'%(period[0], period[1]))
+
     def NL_GLE_integrate(self):
         self.parse_input()
         self.gen_initial_values()
+        self.print_vals()
         print('Integrating using BAOAB scheme')
         for trj in range(self.number_trjs):
             self.x, self.v, self.x_vec, self.v_vec = BAOAB_integrator(
