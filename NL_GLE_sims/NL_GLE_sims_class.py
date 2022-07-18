@@ -111,14 +111,23 @@ class NL_GLE_sims():
     def print_vals(self):
         print('epsilon = %.3g,   %.3g'%(np.sqrt(self.masses[1] / self.masses[0]), 
                                         np.sqrt(self.masses[2] / self.masses[0])))
-        mem_time = 2 * self.masses[1:] / self.gammas[1:]
-        nu_sq = mem_time * self.coupling_ks / self.gammas[1:] - 1
+        self.mem_time = 2 * self.masses[1:] / self.gammas[1:]
+        nu_sq = self.mem_time * self.coupling_ks / self.gammas[1:] - 1
         if any(nu_sq) < 0.:
             print('nu_sq = ', nu_sq)
             raise ValueError('nu squared is negative!')
-        freq = np.sqrt(nu_sq) / (2 * np.pi * mem_time)
-        print('memory times = %.3g,   %.3g'%(mem_time[0], mem_time[1]))
-        print('oscillation freq. = %.3g,   %.3g'%(freq[0], freq[1]))
+        self.freq = np.sqrt(nu_sq) / (2 * np.pi * self.mem_time)
+        print('memory times = %.3g,   %.3g'%(self.mem_time[0], self.mem_time[1]))
+        print('oscillation freq. = %.3g,   %.3g'%(self.freq[0], self.freq[1]))
+
+    def write_info_file(self):
+        with open(self.path_to_save+'info.txt', 'a') as f:
+                f.write('epsilon = %.3g, %.3g'%(np.sqrt(self.masses[1] / self.masses[0]), 
+                                                np.sqrt(self.masses[2] / self.masses[0])))
+                f.write('\n')
+                f.write('memory times = %.3g, %.3g'%(self.mem_time[0], self.mem_time[1]))
+                f.write('\n')
+                f.write('oscillation freq. = %.3g, %.3g'%(self.freq[0], self.freq[1]))
 
     def NL_GLE_integrate(self):
         self.parse_input()
@@ -167,6 +176,7 @@ class NL_GLE_sims():
             self.plot_fe()
         if self.save:
                 self.save_fe()
+                self.write_info_file()
 
     
     def memory(self, x, t):
