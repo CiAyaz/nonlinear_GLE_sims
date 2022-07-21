@@ -14,7 +14,7 @@ class NL_GLE_sims():
         gammas, 
         masses,
         coupling_ks,
-        alphas, 
+        alphas = None, 
         dt = 0.01,
         traj_length = int(1e6), 
         number_trajs = 1,
@@ -25,7 +25,8 @@ class NL_GLE_sims():
         plot = True,
         save = False,
         path_to_save = './',
-        integrator = 'leap_frog'
+        integrator = 'leap_frog',
+        non_local = False
         ):
         self.dt = dt
         self.trj_len = traj_length
@@ -42,11 +43,24 @@ class NL_GLE_sims():
         self.save = save
         self.path_to_save = path_to_save
         self.integrator = integrator
+        self.non_local = non_local
 
     def parse_input(self):
-        for input in [self.gammas, self.masses, self.coupling_ks, self.alphas]:
-            if not isinstance(input, (np.ndarray, list)):
-                raise TypeError('Give gammas, ks, alphas and masses as list of scalars or numpy.ndarray!')
+        if not self.non_local:
+            for input in [self.gammas, self.masses, self.coupling_ks, self.alphas]:
+                if not isinstance(input, (np.ndarray, list)):
+                    raise TypeError('Give gammas, ks, alphas and masses as list of scalars or numpy.ndarray!')
+            
+            if isinstance(self.alphas, list):
+                self.alphas = np.array(self.alphas)
+
+            if len(self.alphas) != len(self.coupling_ks):
+                raise ShapeError('length alphas = length coupling_ks is not fulfilled!')
+        else:
+            for input in [self.gammas, self.masses, self.coupling_ks]:
+                if not isinstance(input, (np.ndarray, list)):
+                    raise TypeError('Give gammas, ks and masses as list of scalars or numpy.ndarray!')
+
 
         if isinstance(self.gammas, list):
             self.gammas = np.array(self.gammas)
@@ -57,15 +71,10 @@ class NL_GLE_sims():
         if isinstance(self.masses, list):
             self.masses = np.array(self.masses)
 
-        if isinstance(self.alphas, list):
-            self.alphas = np.array(self.alphas)
-
         if len(self.masses) != len(self.gammas):
             raise ShapeError('length masses = length gammas is not fulfilled!')
         if len(self.gammas) != len(self.coupling_ks) + 1:
             raise ShapeError('length gammas = length coupling_ks + 1 is not fulfilled!')
-        if len(self.alphas) != len(self.coupling_ks):
-            raise ShapeError('length alphas = length coupling_ks is not fulfilled!')
 
     def gen_initial_values(self): 
         self.x_vec = np.zeros_like(self.masses)
@@ -112,7 +121,7 @@ class NL_GLE_sims():
         print('epsilon = %.3g,   %.3g'%(np.sqrt(self.masses[1] / self.masses[0]), 
                                         np.sqrt(self.masses[2] / self.masses[0])))
         self.mem_time = 2 * self.masses[1:] / self.gammas[1:]
-        nu_sq = self.mem_time * self.coupling_ks / self.gammas[1:] - 1
+        nu_sq = 2 * self.mem_time * self.coupling_ks / self.gammas[1:] - 1
         if any(nu_sq) < 0.:
             print('nu_sq = ', nu_sq)
             raise ValueError('nu squared is negative!')
@@ -133,34 +142,52 @@ class NL_GLE_sims():
         self.parse_input()
         self.gen_initial_values()
         self.print_vals()
-        if self.integrator == 'BAOAB':
-            print('Integrating using BAOAB scheme')
-            for trj in range(self.number_trjs):
-                self.x, self.v, self.x_vec, self.v_vec = BAOAB_integrator(
-                    self.trj_len,
-                    self.x_vec,
-                    self.v_vec,
-                    self.masses, 
-                    self.coupling_ks,
-                    self.alphas,
-                    self.gammas, 
-                    self.dt,
-                    self.kT,
-                    self.U0)
-                self.compute_distribution()
-                if self.save:
-                    np.save(self.path_to_save + 'traj_'+str(trj), self.x)
-                    np.save(self.path_to_save + 'vel_'+str(trj), self.v)
+        if not self.non_local:
+            if self.integrator == 'BAOAB':
+                print('Integrating using BAOAB scheme')
+                for trj in range(self.number_trjs):
+                    self.x, self.v, self.x_vec, self.v_vec = BAOAB_integrator(
+                        self.trj_len,
+                        self.x_vec,
+                        self.v_vec,
+                        self.masses, 
+                        self.coupling_ks,
+                        self.alphas,
+                        self.gammas, 
+                        self.dt,
+                        self.kT,
+                        self.U0)
+                    self.compute_distribution()
+                    if self.save:
+                        np.save(self.path_to_save + 'traj_'+str(trj), self.x)
+                        np.save(self.path_to_save + 'vel_'+str(trj), self.v)
+            else:
+                print('Integrating using leap-frog scheme')
+                for trj in range(self.number_trjs):
+                    self.x, self.v, self.x_vec, self.v_vec = leapfrog_integrator(
+                        self.trj_len,
+                        self.x_vec,
+                        self.v_vec,
+                        self.masses, 
+                        self.coupling_ks,
+                        self.alphas,
+                        self.gammas, 
+                        self.dt,
+                        self.kT,
+                        self.U0)
+                    self.compute_distribution()
+                    if self.save:
+                        np.save(self.path_to_save + 'traj_'+str(trj), self.x)
+                        np.save(self.path_to_save + 'vel_'+str(trj), self.v)
         else:
             print('Integrating using leap-frog scheme')
             for trj in range(self.number_trjs):
-                self.x, self.v, self.x_vec, self.v_vec = leapfrog_integrator(
+                self.x, self.v, self.x_vec, self.v_vec = leapfrog_integrator_linear_coupling(
                     self.trj_len,
                     self.x_vec,
                     self.v_vec,
                     self.masses, 
                     self.coupling_ks,
-                    self.alphas,
                     self.gammas, 
                     self.dt,
                     self.kT,
@@ -169,7 +196,6 @@ class NL_GLE_sims():
                 if self.save:
                     np.save(self.path_to_save + 'traj_'+str(trj), self.x)
                     np.save(self.path_to_save + 'vel_'+str(trj), self.v)
-
 
         self.compute_free_energy()
         if self.plot:
@@ -180,14 +206,21 @@ class NL_GLE_sims():
 
     
     def memory(self, x, t):
-        funcs = [dalpha1_dx, dalpha2_dx]
-        taus = 2 * self.masses[1:] / self.gammas[1:]
-        nus = np.sqrt(2 * self.coupling_ks * taus / self.gammas[1:] - 1)
-        ft =  (self.coupling_ks * np.exp(-t / taus) * (np.cos(nus * t / taus)
-                + np.sin(nus * t / taus) / nus) / self.masses[0])
-        memory = 0.
-        for index, func in enumerate(funcs):
-            memory += func(x, self.alphas[index]) ** 2 * ft[index]
+        if not self.non_local:
+            funcs = [dalpha1_dx, dalpha2_dx]
+            taus = 2 * self.masses[1:] / self.gammas[1:]
+            nus = np.sqrt(2 * self.coupling_ks * taus / self.gammas[1:] - 1)
+            ft =  (self.coupling_ks * np.exp(-t / taus) * (np.cos(nus * t / taus)
+                    + np.sin(nus * t / taus) / nus) / self.masses[0])
+            memory = 0.
+            for index, func in enumerate(funcs):
+                memory += func(x, self.alphas[index]) ** 2 * ft[index]
+        else:
+            taus = 2 * self.masses[1:] / self.gammas[1:]
+            nus = np.sqrt(2 * self.coupling_ks * taus / self.gammas[1:] - 1)
+            ft =  (self.coupling_ks * np.exp(-t / taus) * (np.cos(nus * t / taus)
+                    + np.sin(nus * t / taus) / nus) / self.masses[0])
+            memory = np.sum(ft)
         return memory 
 
     def memory_function(self, x, t):
