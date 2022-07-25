@@ -149,6 +149,86 @@ def leapfrog_integrator(nsteps, x_vec, v_vec, masses, couplings, alphas, frictio
 
     return x, v, x_vec, v_vec
 
+
+@njit()
+def Runge_Kutta_integrator(
+    nsteps, x_vec, v_vec, masses, couplings, alphas, friction, dt, kT, U0):
+    """
+    Integrator for a Markovian Embedding with exponentially
+    decaying memory kernels, characterized by friction gamma[i]
+    and memory time tgammas[i]. Uses spline rep from pot_edges
+    and amatrix. Restarts sim from pos x0 and velocitiy v
+    and position of the overdamped orth. dof at R.
+    """
+
+    # relevant constants
+    nvars = len(x_vec)
+    xi_factor = np.zeros(nvars)
+    xi = np.zeros(nvars)
+    xi_factor[0] = sqrt(2 * kT * friction[0] * dt)
+    for y in range(1, nvars):
+        xi_factor[y] = sqrt(2 * kT / friction[y] * dt)
+
+    mass = masses[0] 
+    
+    # runge kutta step factors
+    RK = np.array([0.5, 0.5, 1.])
+
+    # arrays to store temp data
+    vars = np.zeros((4, nvars))
+    vs = np.zeros(4)
+    vars[0] = x_vec
+    vs[0] = v_vec[0]
+
+    k = np.zeros((4, nvars))
+    kv = np.zeros(4)
+    
+    # trajectory array
+    x = np.zeros(nsteps)
+    v = np.zeros(nsteps)
+
+    for step in range(nsteps):
+        # draw random force
+        xi[1:] = np.random.normal(0., 1., nvars - 1)
+        # first 3 runge kutta steps
+        for rk in range(3):
+            ft = force(vars[rk], couplings, alphas, U0, nvars)
+            k[rk, 0] = dt * vs[rk]
+            kv[rk] = (dt * (ft[0]
+            - friction[0] * vs[rk]) + xi_factor[0] * xi[0]) / mass
+            # orhtogonal degrees of freedom
+            for y in range(1, nvars):
+                k[rk, y] = (dt * ft[y] / friction[y]
+                + xi_factor[y]*xi[y])
+                vars[rk + 1, y] = vars[0, y] + RK[rk] * k[rk, y]
+            # variable of interest
+            vars[rk + 1, 0] = vars[0, 0] + RK[rk] * k[rk, 0]
+            vs[rk + 1] = vs[0] + RK[rk] * kv[rk]
+
+        # last runge kutta step
+        ft = force(vars[3], couplings, alphas, U0, nvars)
+        k[3, 0] = dt * vs[3]
+        k[3, 1] = (dt * (ft[0]
+        - friction[0] * vs[3]) + xi_factor[0] * xi[0]) / mass
+        # orhtogonal degrees of freedom
+        for y in range(1, nvars):
+            k[3, y] = (dt * ft[y] / friction[y]
+            + xi_factor[y]*xi[y])
+            vars[0, y] += (k[0, y] + 2 * k[1, y] + 2 * k[2, y] + k[3, y]) / 6
+        # variable of interest
+        vars[0, 0] += (k[0, 0] + 2 * k[1, 0] + 2 * k[2, 0] + k[3, 0]) / 6
+        vs[0] += (kv[0] + 2 * kv[1] + 2 * kv[2] + kv[3]) / 6
+
+        x[step] = vars[0, 0]
+        v[step] = vs[0]
+
+    x_vec = vars[0]
+    v_vec[0] = vs[0]
+
+    return x, vars[0], x_vec, v_vec
+
+
+
 @njit()
 def leapfrog_integrator_linear_coupling(nsteps, x_vec, v_vec, masses, couplings, friction, dt, kT, U0):
     
