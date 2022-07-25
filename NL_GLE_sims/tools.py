@@ -225,7 +225,7 @@ def Runge_Kutta_integrator(
     x_vec = vars[0]
     v_vec[0] = vs[0]
 
-    return x, vars[0], x_vec, v_vec
+    return x, v, x_vec, v_vec
 
 
 

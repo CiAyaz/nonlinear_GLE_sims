@@ -82,8 +82,9 @@ class NL_GLE_sims():
         self.x_vec[0] = -1.
         for index, coupling in enumerate(self.coupling_ks):
             self.x_vec[1+index] = np.random.normal(self.x_vec[0], np.sqrt(self.kT / coupling))
-        for index,m in enumerate(self.masses):
-            self.v_vec[index] = np.random.normal(0., np.sqrt(self.kT / m))
+        if not self.integrator == "RK":
+            for index,m in enumerate(self.masses):
+                self.v_vec[index] = np.random.normal(0., np.sqrt(self.kT / m))
 
     def compute_distribution(self):
         if self.number_trjs == 1:
@@ -118,25 +119,35 @@ class NL_GLE_sims():
         np.save(self.path_to_save + 'traj_fe', array)
 
     def print_vals(self):
-        print('epsilon = %.3g,   %.3g'%(np.sqrt(self.masses[1] / self.masses[0]), 
-                                        np.sqrt(self.masses[2] / self.masses[0])))
-        self.mem_time = 2 * self.masses[1:] / self.gammas[1:]
-        nu_sq = 2 * self.mem_time * self.coupling_ks / self.gammas[1:] - 1
-        if any(nu_sq) < 0.:
-            print('nu_sq = ', nu_sq)
-            raise ValueError('nu squared is negative!')
-        self.freq = np.sqrt(nu_sq) / (2 * np.pi * self.mem_time)
-        print('memory times = %.3g,   %.3g'%(self.mem_time[0], self.mem_time[1]))
-        print('oscillation freq. = %.3g,   %.3g'%(self.freq[0], self.freq[1]))
+        if not self.integrator == "RK":
+            print('epsilon = %.3g,   %.3g'%(np.sqrt(self.masses[1] / self.masses[0]), 
+                                            np.sqrt(self.masses[2] / self.masses[0])))
+            self.mem_time = 2 * self.masses[1:] / self.gammas[1:]
+            nu_sq = 2 * self.mem_time * self.coupling_ks / self.gammas[1:] - 1
+            if any(nu_sq) < 0.:
+                print('nu_sq = ', nu_sq)
+                raise ValueError('nu squared is negative!')
+            self.freq = np.sqrt(nu_sq) / (2 * np.pi * self.mem_time)
+            print('memory times = %.3g,   %.3g'%(self.mem_time[0], self.mem_time[1]))
+            print('oscillation freq. = %.3g,   %.3g'%(self.freq[0], self.freq[1]))
+        else:
+            self.mem_time = self.gammas[1:] / self.coupling_ks
+            epsilon = self.masses[0] * self.coupling_ks / self.gammas[1:] **2
+            print(f"epsilon = {epsilon[0]:.3f},   {epsilon[1]:.3f}")
+            print('memory times = %.3g,   %.3g'%(self.mem_time[0], self.mem_time[1]))
 
     def write_info_file(self):
-        with open(self.path_to_save+'info.txt', 'a') as f:
-                f.write('epsilon = %.3g, %.3g'%(np.sqrt(self.masses[1] / self.masses[0]), 
-                                                np.sqrt(self.masses[2] / self.masses[0])))
-                f.write('\n')
-                f.write('memory times = %.3g, %.3g'%(self.mem_time[0], self.mem_time[1]))
-                f.write('\n')
-                f.write('oscillation freq. = %.3g, %.3g'%(self.freq[0], self.freq[1]))
+        if not self.integrator == "RK":
+            with open(self.path_to_save+'info.txt', 'a') as f:
+                    f.write('epsilon = %.3g, %.3g'%(np.sqrt(self.masses[1] / self.masses[0]), 
+                                                    np.sqrt(self.masses[2] / self.masses[0])))
+                    f.write('\n')
+                    f.write('memory times = %.3g, %.3g'%(self.mem_time[0], self.mem_time[1]))
+                    f.write('\n')
+                    f.write('oscillation freq. = %.3g, %.3g'%(self.freq[0], self.freq[1]))
+        else:
+            with open(self.path_to_save+'info.txt', 'a') as f:
+                f.write(f'memory times = {self.mem_time[0]:.3f},    {self.mem_time[1]:.3f}')
 
     def NL_GLE_integrate(self):
         self.parse_input()
@@ -147,6 +158,25 @@ class NL_GLE_sims():
                 print('Integrating using BAOAB scheme')
                 for trj in range(self.number_trjs):
                     self.x, self.v, self.x_vec, self.v_vec = BAOAB_integrator(
+                        self.trj_len,
+                        self.x_vec,
+                        self.v_vec,
+                        self.masses, 
+                        self.coupling_ks,
+                        self.alphas,
+                        self.gammas, 
+                        self.dt,
+                        self.kT,
+                        self.U0)
+                    self.compute_distribution()
+                    if self.save:
+                        np.save(self.path_to_save + 'traj_'+str(trj), self.x)
+                        np.save(self.path_to_save + 'vel_'+str(trj), self.v)
+
+            elif self.integrator == 'RK':
+                print('Overdamped coupling using Runge-Kutta integrator')
+                for trj in range(self.number_trjs):
+                    self.x, self.v, self.x_vec, self.v_vec = Runge_Kutta_integrator(
                         self.trj_len,
                         self.x_vec,
                         self.v_vec,
@@ -206,23 +236,32 @@ class NL_GLE_sims():
 
     
     def memory(self, x, t):
-        if not self.non_local:
+        if not self.integrator == "RK":
+            if not self.non_local:
+                funcs = [dalpha1_dx, dalpha2_dx]
+                taus = 2 * self.masses[1:] / self.gammas[1:]
+                nus = np.sqrt(2 * self.coupling_ks * taus / self.gammas[1:] - 1)
+                ft =  (self.coupling_ks * np.exp(-t / taus) * (np.cos(nus * t / taus)
+                        + np.sin(nus * t / taus) / nus) / self.masses[0])
+                memory = 0.
+                for index, func in enumerate(funcs):
+                    memory += func(x, self.alphas[index]) ** 2 * ft[index]
+            else:
+                taus = 2 * self.masses[1:] / self.gammas[1:]
+                nus = np.sqrt(2 * self.coupling_ks * taus / self.gammas[1:] - 1)
+                ft =  (self.coupling_ks * np.exp(-t / taus) * (np.cos(nus * t / taus)
+                        + np.sin(nus * t / taus) / nus) / self.masses[0])
+                memory = np.sum(ft)
+        else:
             funcs = [dalpha1_dx, dalpha2_dx]
-            taus = 2 * self.masses[1:] / self.gammas[1:]
-            nus = np.sqrt(2 * self.coupling_ks * taus / self.gammas[1:] - 1)
-            ft =  (self.coupling_ks * np.exp(-t / taus) * (np.cos(nus * t / taus)
-                    + np.sin(nus * t / taus) / nus) / self.masses[0])
+            taus = self.gammas[1:] / self.coupling_ks
+            ft =  (self.gammas[1:] * np.exp(-t / taus) / taus / self.masses[0])
             memory = 0.
             for index, func in enumerate(funcs):
                 memory += func(x, self.alphas[index]) ** 2 * ft[index]
-        else:
-            taus = 2 * self.masses[1:] / self.gammas[1:]
-            nus = np.sqrt(2 * self.coupling_ks * taus / self.gammas[1:] - 1)
-            ft =  (self.coupling_ks * np.exp(-t / taus) * (np.cos(nus * t / taus)
-                    + np.sin(nus * t / taus) / nus) / self.masses[0])
-            memory = np.sum(ft)
-        return memory 
-
+        
+        return memory
+        
     def memory_function(self, x, t):
         memory_vec = np.vectorize(self.memory)
         return(memory_vec(x,t))
