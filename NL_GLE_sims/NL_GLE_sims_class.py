@@ -235,7 +235,7 @@ class NL_GLE_sims():
                 self.write_info_file()
 
     
-    def memory(self, x, t):
+    def memory_linear_friction(self, x, t):
         if not self.integrator == "RK":
             if not self.non_local:
                 funcs = [dalpha1_dx, dalpha2_dx]
@@ -252,6 +252,7 @@ class NL_GLE_sims():
                 ft =  (self.coupling_ks * np.exp(-t / taus) * (np.cos(nus * t / taus)
                         + np.sin(nus * t / taus) / nus) / self.masses[0])
                 memory = np.sum(ft)
+                
         else:
             funcs = [dalpha1_dx, dalpha2_dx]
             taus = self.gammas[1:] / self.coupling_ks
@@ -259,6 +260,16 @@ class NL_GLE_sims():
             memory = 0.
             for index, func in enumerate(funcs):
                 memory += func(x, self.alphas[index]) ** 2 * ft[index]
+        
+        return memory
+        
+    def memory_hybrid(self, x, t):
+        funcs = [dalpha1_dx, dalpha2_dx]
+        taus = self.gammas[1:] / self.coupling_ks
+        ft =  (self.gammas[1:] * np.exp(-t / taus) / taus / self.masses[0])
+        memory = 0.
+        for index, func in enumerate(funcs):
+            memory += func(x, self.alphas[index]) ** 2 * ft[index]
         
         return memory
         
