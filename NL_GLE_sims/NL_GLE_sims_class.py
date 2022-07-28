@@ -256,23 +256,44 @@ class NL_GLE_sims():
         else:
             funcs = [dalpha1_dx, dalpha2_dx]
             taus = self.gammas[1:] / self.coupling_ks
-            ft =  (self.gammas[1:] * np.exp(-t / taus) / taus / self.masses[0])
+            ft =  (self.coupling_ks * np.exp(-t / taus) / self.masses[0])
             memory = 0.
             for index, func in enumerate(funcs):
                 memory += func(x, self.alphas[index]) ** 2 * ft[index]
         
         return memory
         
-    def memory_hybrid(self, x, t):
+    def hybrid_GammaL(self, t):
         funcs = [dalpha1_dx, dalpha2_dx]
         taus = self.gammas[1:] / self.coupling_ks
-        ft =  (self.gammas[1:] * np.exp(-t / taus) / taus / self.masses[0])
+        ft =  (self.coupling_ks * np.exp(-t / taus) / self.masses[0])
+        pdf_pos = np.linspace(-3,3,1000)
+        pdf = np.exp(-PMF(pdf_pos, self.U0))
+        averages = []
+        for index,func in enumerate(funcs):
+            averages.append(np.trapz(pdf * func(pdf_pos, self.alphas[index]) ** 2, pdf_pos))
         memory = 0.
         for index, func in enumerate(funcs):
-            memory += func(x, self.alphas[index]) ** 2 * ft[index]
+            memory += averages[index]  * ft[index]
         
         return memory
+
+    def hybrid_D(self, x, t):
+        funcs = [dalpha1_dx, dalpha2_dx]
+        taus = self.gammas[1:] / self.coupling_ks
+        ft =  (self.kT * self.gammas * np.exp(-t / taus) / self.masses[0] ** 2)
+        pdf_pos = np.linspace(-3,3,1000)
+        pdf = np.exp(-PMF(pdf_pos, self.U0))
+        averages = []
+        for index,func in enumerate(funcs):
+            averages.append(np.trapz(pdf * func(pdf_pos, self.alphas[index]) ** 2, pdf_pos))
+        memory = 0.
+        for index, func in enumerate(funcs):
+            memory += (func(x, self.alphas[index]) ** 2 - averages[index])  * ft[index]
         
-    def memory_function(self, x, t):
-        memory_vec = np.vectorize(self.memory)
+        return memory
+    
+
+    def memory_function(self, x, t, gle = "hybridGLE", kernel = "GammaL"):
+        memory_vec = np.vectorize(self.memory_linear_friction)
         return(memory_vec(x,t))
