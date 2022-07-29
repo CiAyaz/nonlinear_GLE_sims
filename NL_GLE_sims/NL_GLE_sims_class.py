@@ -266,12 +266,14 @@ class NL_GLE_sims():
         
         return memory
         
-    def hybrid_GammaL(self, t):
+    def hybrid_GammaL(self, x, t):
         funcs = [dalpha1_dx, dalpha2_dx]
         taus = self.gammas[1:] / self.coupling_ks
         ft =  (self.coupling_ks * np.exp(-t / taus) / self.masses[0])
         pdf_pos = np.linspace(-3,3,1000)
-        pdf = np.exp(-PMF(pdf_pos, self.U0))
+        pdf = np.exp(-PMF(pdf_pos, self.U0) / self.kT)
+        pdf_norm = np.trapz(pdf, pdf_pos)
+        pdf /= pdf_norm
         averages = []
         for index,func in enumerate(funcs):
             averages.append(np.trapz(pdf * func(pdf_pos, self.alphas[index]) ** 2, pdf_pos))
@@ -284,9 +286,9 @@ class NL_GLE_sims():
     def hybrid_D(self, x, t):
         funcs = [dalpha1_dx, dalpha2_dx]
         taus = self.gammas[1:] / self.coupling_ks
-        ft =  (self.kT * self.gammas * np.exp(-t / taus) / self.masses[0] ** 2)
+        ft =  (self.kT * self.gammas[1:] * (np.exp(-t / taus)-1) / self.masses[0] ** 2)
         pdf_pos = np.linspace(-3,3,1000)
-        pdf = np.exp(-PMF(pdf_pos, self.U0))
+        pdf = np.exp(-PMF(pdf_pos, self.U0) / self.kT)
         pdf_norm = np.trapz(pdf, pdf_pos)
         pdf /= pdf_norm
         averages = []
