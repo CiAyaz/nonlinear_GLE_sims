@@ -44,6 +44,8 @@ class NL_GLE_sims():
         self.path_to_save = path_to_save
         self.integrator = integrator
         self.non_local = non_local
+        self.x_vec = np.array([])
+        self.v_vec = np.array([])
 
     def parse_input(self):
         if not self.non_local:
@@ -132,7 +134,7 @@ class NL_GLE_sims():
             print('oscillation freq. = %.3g,   %.3g'%(self.freq[0], self.freq[1]))
         else:
             self.mem_time = self.gammas[1:] / self.coupling_ks
-            epsilon = self.masses[0] * self.coupling_ks / self.gammas[1:] **2
+            epsilon = self.gammas[1:] / np.sqrt(self.masses[0] * self.coupling_ks)
             print(f"epsilon = {epsilon[0]:.3f},   {epsilon[1]:.3f}")
             print('memory times = %.3g,   %.3g'%(self.mem_time[0], self.mem_time[1]))
 
@@ -151,7 +153,8 @@ class NL_GLE_sims():
 
     def NL_GLE_integrate(self):
         self.parse_input()
-        self.gen_initial_values()
+        if len(self.x_vec) == 0:
+            self.gen_initial_values()
         self.print_vals()
         if not self.non_local:
             if self.integrator == 'BAOAB':
@@ -284,6 +287,8 @@ class NL_GLE_sims():
         ft =  (self.kT * self.gammas * np.exp(-t / taus) / self.masses[0] ** 2)
         pdf_pos = np.linspace(-3,3,1000)
         pdf = np.exp(-PMF(pdf_pos, self.U0))
+        pdf_norm = np.trapz(pdf, pdf_pos)
+        pdf /= pdf_norm
         averages = []
         for index,func in enumerate(funcs):
             averages.append(np.trapz(pdf * func(pdf_pos, self.alphas[index]) ** 2, pdf_pos))
@@ -295,5 +300,11 @@ class NL_GLE_sims():
     
 
     def memory_function(self, x, t, gle = "hybridGLE", kernel = "GammaL"):
-        memory_vec = np.vectorize(self.memory_linear_friction)
+        if gle == "hybridGLE":
+            if kernel == "GammaL":
+                memory_vec = np.vectorize(self.hybrid_GammaL)
+            else:
+                memory_vec = np.vectorize(self.hybrid_D)
+        else:
+            memory_vec = np.vectorize(self.memory_linear_friction)
         return(memory_vec(x,t))
