@@ -7,7 +7,25 @@ from NL_GLE_sims.tools import *
 
 class NL_GLE_sims():
     """
-    Main class for nonlinear GLE simulations.
+    Main class for nonlinear GLE simulations (N particles).
+    gammas: list of scalars (dim N), friction coefficient for each variable.
+    masses: list of scalars (dim N), masses for each variable. Mass is zero for overdamped particles.
+    coupling_ks: list of scalars (dim N-1), coupling coefficients for each auxiliary variable.
+    dt: float, time step.
+    number_trajs: integer, number of generated trajectories, continuations.
+    kT: float, thermal energy.
+    U0: float, barrier height in kT.
+    nbins: integer, number of bins for computing the distributions.
+    hist_range: tuple (xmin, xmax), x-range of distribution P(x).
+    plot: bool, set True if you want the PMF plotted after simulation.
+    save: bool, set True if you want the trajectories saved.
+    path_to_save: string, path for saving trajs.
+    auxiliary_var: string, "underdamped" or "overdamped".
+    integrator: string, if auxiliary_var is underdamped, then
+                "BAOAB" or "leapfrog"
+                        if auxiliary_var is overdamped, then
+                "RK" or "leapfrogEuler".
+    non_local: bool, set True if you want non-local coupling.
     """
 
     def __init__(self,
@@ -25,6 +43,7 @@ class NL_GLE_sims():
         plot = True,
         save = False,
         path_to_save = './',
+        auxiliary_var = "underdamped",
         integrator = 'leap_frog',
         non_local = False
         ):
@@ -42,6 +61,7 @@ class NL_GLE_sims():
         self.plot = plot
         self.save = save
         self.path_to_save = path_to_save
+        self.aux_var = auxiliary_var
         self.integrator = integrator
         self.non_local = non_local
         self.x_vec = np.array([])
@@ -84,7 +104,7 @@ class NL_GLE_sims():
         self.x_vec[0] = -1.
         for index, coupling in enumerate(self.coupling_ks):
             self.x_vec[1+index] = np.random.normal(self.x_vec[0], np.sqrt(self.kT / coupling))
-        if not self.integrator == "RK":
+        if not self.aux_var == "overdamped":
             for index,m in enumerate(self.masses):
                 self.v_vec[index] = np.random.normal(0., np.sqrt(self.kT / m))
 
@@ -121,7 +141,7 @@ class NL_GLE_sims():
         np.save(self.path_to_save + 'traj_fe', array)
 
     def print_vals(self):
-        if not self.integrator == "RK":
+        if not self.aux_var == "overdamped":
             print('epsilon = %.3g,   %.3g'%(np.sqrt(self.masses[1] / self.masses[0]), 
                                             np.sqrt(self.masses[2] / self.masses[0])))
             self.mem_time = 2 * self.masses[1:] / self.gammas[1:]
@@ -139,7 +159,7 @@ class NL_GLE_sims():
             print('memory times = %.3g,   %.3g'%(self.mem_time[0], self.mem_time[1]))
 
     def write_info_file(self):
-        if not self.integrator == "RK":
+        if not self.aux_var == "overdamped":
             with open(self.path_to_save+'info.txt', 'a') as f:
                     f.write('epsilon = %.3g, %.3g'%(np.sqrt(self.masses[1] / self.masses[0]), 
                                                     np.sqrt(self.masses[2] / self.masses[0])))
@@ -151,68 +171,90 @@ class NL_GLE_sims():
             with open(self.path_to_save+'info.txt', 'a') as f:
                 f.write(f'memory times = {self.mem_time[0]:.3f},    {self.mem_time[1]:.3f}')
 
-    def NL_GLE_integrate(self):
-        self.parse_input()
-        if len(self.x_vec) == 0:
-            self.gen_initial_values()
-        self.print_vals()
+    def integrate(self):
         if not self.non_local:
-            if self.integrator == 'BAOAB':
-                print('Integrating using BAOAB scheme')
-                for trj in range(self.number_trjs):
-                    self.x, self.v, self.x_vec, self.v_vec = BAOAB_integrator(
-                        self.trj_len,
-                        self.x_vec,
-                        self.v_vec,
-                        self.masses, 
-                        self.coupling_ks,
-                        self.alphas,
-                        self.gammas, 
-                        self.dt,
-                        self.kT,
-                        self.U0)
-                    self.compute_distribution()
-                    if self.save:
-                        np.save(self.path_to_save + 'traj_'+str(trj), self.x)
-                        np.save(self.path_to_save + 'vel_'+str(trj), self.v)
+            print("Local coupling")
+            if self.aux_var == "underdamped":
+                print("Underdamped coupling")
+                if self.integrator == 'BAOAB':
+                    print('Integrating using BAOAB scheme')
+                    for trj in range(self.number_trjs):
+                        self.x, self.v, self.x_vec, self.v_vec = BAOAB_integrator(
+                            self.trj_len,
+                            self.x_vec,
+                            self.v_vec,
+                            self.masses, 
+                            self.coupling_ks,
+                            self.alphas,
+                            self.gammas, 
+                            self.dt,
+                            self.kT,
+                            self.U0)
+                        self.compute_distribution()
+                        if self.save:
+                            np.save(self.path_to_save + 'traj_'+str(trj), self.x)
+                            np.save(self.path_to_save + 'vel_'+str(trj), self.v)
+                elif self.integrator == "leapfrog":
+                    print('Integrating using leap-frog scheme')
+                    for trj in range(self.number_trjs):
+                        self.x, self.v, self.x_vec, self.v_vec = leapfrog_integrator(
+                            self.trj_len,
+                            self.x_vec,
+                            self.v_vec,
+                            self.masses, 
+                            self.coupling_ks,
+                            self.alphas,
+                            self.gammas, 
+                            self.dt,
+                            self.kT,
+                            self.U0)
+                        self.compute_distribution()
+                        if self.save:
+                            np.save(self.path_to_save + 'traj_'+str(trj), self.x)
+                            np.save(self.path_to_save + 'vel_'+str(trj), self.v)
 
-            elif self.integrator == 'RK':
-                print('Overdamped coupling using Runge-Kutta integrator')
-                for trj in range(self.number_trjs):
-                    self.x, self.v, self.x_vec, self.v_vec = Runge_Kutta_integrator(
-                        self.trj_len,
-                        self.x_vec,
-                        self.v_vec,
-                        self.masses, 
-                        self.coupling_ks,
-                        self.alphas,
-                        self.gammas, 
-                        self.dt,
-                        self.kT,
-                        self.U0)
-                    self.compute_distribution()
-                    if self.save:
-                        np.save(self.path_to_save + 'traj_'+str(trj), self.x)
-                        np.save(self.path_to_save + 'vel_'+str(trj), self.v)
-            else:
-                print('Integrating using leap-frog scheme')
-                for trj in range(self.number_trjs):
-                    self.x, self.v, self.x_vec, self.v_vec = leapfrog_integrator(
-                        self.trj_len,
-                        self.x_vec,
-                        self.v_vec,
-                        self.masses, 
-                        self.coupling_ks,
-                        self.alphas,
-                        self.gammas, 
-                        self.dt,
-                        self.kT,
-                        self.U0)
-                    self.compute_distribution()
-                    if self.save:
-                        np.save(self.path_to_save + 'traj_'+str(trj), self.x)
-                        np.save(self.path_to_save + 'vel_'+str(trj), self.v)
+            elif self.aux_var == "overdamped":
+                print("Overdamped coupling")
+                if self.integrator == "RK":
+                    print('Integrating using 4-th order Runge-Kutta')
+                    for trj in range(self.number_trjs):
+                        self.x, self.v, self.x_vec, self.v_vec = Runge_Kutta_integrator(
+                            self.trj_len,
+                            self.x_vec,
+                            self.v_vec,
+                            self.masses, 
+                            self.coupling_ks,
+                            self.alphas,
+                            self.gammas, 
+                            self.dt,
+                            self.kT,
+                            self.U0)
+                        self.compute_distribution()
+                        if self.save:
+                            np.save(self.path_to_save + 'traj_'+str(trj), self.x)
+                            np.save(self.path_to_save + 'vel_'+str(trj), self.v)
+
+                if self.integrator == "leapfrogEuler":
+                    print('Integrating using leapfrog-Euler')
+                    for trj in range(self.number_trjs):
+                        self.x, self.v, self.x_vec, self.v_vec = leapfrog_Euler_integrator(
+                            self.trj_len,
+                            self.x_vec,
+                            self.v_vec,
+                            self.masses, 
+                            self.coupling_ks,
+                            self.alphas,
+                            self.gammas, 
+                            self.dt,
+                            self.kT,
+                            self.U0)
+                        self.compute_distribution()
+                        if self.save:
+                            np.save(self.path_to_save + 'traj_'+str(trj), self.x)
+                            np.save(self.path_to_save + 'vel_'+str(trj), self.v)
+
         else:
+            print("Non-local coupling")
             print('Integrating using leap-frog scheme')
             for trj in range(self.number_trjs):
                 self.x, self.v, self.x_vec, self.v_vec = leapfrog_integrator_linear_coupling(
@@ -230,6 +272,12 @@ class NL_GLE_sims():
                     np.save(self.path_to_save + 'traj_'+str(trj), self.x)
                     np.save(self.path_to_save + 'vel_'+str(trj), self.v)
 
+    def NL_GLE_integrate(self):
+        self.parse_input()
+        if len(self.x_vec) == 0:
+            self.gen_initial_values()
+        self.print_vals()
+        self.integrate()
         self.compute_free_energy()
         if self.plot:
             self.plot_fe()
@@ -239,7 +287,7 @@ class NL_GLE_sims():
 
     
     def memory_linear_friction(self, x, t):
-        if not self.integrator == "RK":
+        if not self.aux_var == "overdamped":
             if not self.non_local:
                 funcs = [dalpha1_dx, dalpha2_dx]
                 taus = 2 * self.masses[1:] / self.gammas[1:]

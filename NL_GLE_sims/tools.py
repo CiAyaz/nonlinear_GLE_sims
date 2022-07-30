@@ -151,6 +151,39 @@ def leapfrog_integrator(nsteps, x_vec, v_vec, masses, couplings, alphas, frictio
 
 
 @njit()
+def leapfrog_Euler_integrator(
+    nsteps, x_vec, v_vec, masses, couplings, alphas, friction, dt, kT, U0):
+    
+    nvars = len(x_vec)
+    th = 0.5 * dt
+    tm = dt / masses[0]
+    tg = np.zeros_like(x_vec)
+    xi_factor = np.zeros_like(x_vec)
+    for nvar in range(1,nvars):
+        tg[nvar] = dt / friction[nvar]
+        xi_factor[nvar] = sqrt(2 * kT * dt / friction[nvar])
+    
+    x=np.zeros(nsteps)
+    v=np.zeros(nsteps)
+
+    for i in range(nsteps):
+
+        x[i] = x_vec[0]
+        v[i] = v_vec[0]
+        
+        f0 = force(x_vec, couplings, alphas, U0, nvars) 
+        x_vec[0] += v_vec[0] * th
+        fh = force(x_vec, couplings, alphas, U0, nvars)
+        v_vec[0] += tm * fh[0]
+        x_vec[0] += th * v_vec[0]
+        for nvar in range(1,nvars):
+            xi = np.random.randn()  
+            x_vec[nvar] += (tg[nvar] * f0[nvar] + xi_factor[nvar] * xi)
+
+    return x, v, x_vec, v_vec
+
+
+@njit()
 def Runge_Kutta_integrator(
     nsteps, x_vec, v_vec, masses, couplings, alphas, friction, dt, kT, U0):
     """
