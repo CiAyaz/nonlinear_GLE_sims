@@ -234,7 +234,7 @@ class NL_GLE_sims():
                             np.save(self.path_to_save + 'traj_'+str(trj), self.x)
                             np.save(self.path_to_save + 'vel_'+str(trj), self.v)
 
-                if self.integrator == "leapfrogEuler":
+                elif self.integrator == "leapfrogEuler":
                     print('Integrating using leapfrog-Euler')
                     for trj in range(self.number_trjs):
                         self.x, self.v, self.x_vec, self.v_vec = leapfrog_Euler_integrator(
@@ -252,6 +252,26 @@ class NL_GLE_sims():
                         if self.save:
                             np.save(self.path_to_save + 'traj_'+str(trj), self.x)
                             np.save(self.path_to_save + 'vel_'+str(trj), self.v)
+
+                elif self.integrator == "2nd_RK":
+                    print('Integrating using 2nd order Runge-Kutta')
+                    for trj in range(self.number_trjs):
+                        self.x, self.v, self.x_vec, self.v_vec = Runge_Kutta_2nd_integrator(
+                            self.trj_len,
+                            self.x_vec,
+                            self.v_vec,
+                            self.masses, 
+                            self.coupling_ks,
+                            self.alphas,
+                            self.gammas, 
+                            self.dt,
+                            self.kT,
+                            self.U0)
+                        self.compute_distribution()
+                        if self.save:
+                            np.save(self.path_to_save + 'traj_'+str(trj), self.x)
+                            np.save(self.path_to_save + 'vel_'+str(trj), self.v)
+
 
         else:
             print("Non-local coupling")
@@ -314,7 +334,7 @@ class NL_GLE_sims():
         
         return memory
         
-    def hybrid_GammaL(self, x, t):
+    def hybrid_GammaL(self, t):
         funcs = [dalpha1_dx, dalpha2_dx]
         taus = self.gammas[1:] / self.coupling_ks
         ft =  (self.coupling_ks * np.exp(-t / taus) / self.masses[0])
@@ -347,14 +367,35 @@ class NL_GLE_sims():
             memory += (func(x, self.alphas[index]) ** 2 - averages[index])  * ft[index]
         
         return memory
+
+
+    def heuristic_D(self, x, t):
+        funcs = [dalpha1_dx, dalpha2_dx]
+        taus = self.gammas[1:] / self.coupling_ks
+        ft =  (self.coupling_ks * np.exp(-t / taus) / self.masses[0])
+        pdf_pos = np.linspace(-3,3,1000)
+        pdf = np.exp(-PMF(pdf_pos, self.U0) / self.kT)
+        pdf_norm = np.trapz(pdf, pdf_pos)
+        pdf /= pdf_norm
+        averages = []
+        for index,func in enumerate(funcs):
+            averages.append(np.trapz(pdf * func(pdf_pos, self.alphas[index]) ** 2, pdf_pos))
+        memory = 0.
+        for index, func in enumerate(funcs):
+            memory += (func(x, self.alphas[index]) ** 2 - averages[index])  * ft[index]
+        
+        return memory
     
 
     def memory_function(self, x, t, gle = "hybridGLE", kernel = "GammaL"):
         if gle == "hybridGLE":
             if kernel == "GammaL":
                 memory_vec = np.vectorize(self.hybrid_GammaL)
-            else:
+                return(memory_vec(t))
+            elif kernel == "D":
                 memory_vec = np.vectorize(self.hybrid_D)
+            elif kernel == "HeuristicD":
+                memory_vec = np.vectorize(self.heuristic_D)
         else:
             memory_vec = np.vectorize(self.memory_linear_friction)
         return(memory_vec(x,t))

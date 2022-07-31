@@ -184,6 +184,71 @@ def leapfrog_Euler_integrator(
 
 
 @njit()
+def Runge_Kutta_2nd_integrator(
+    nsteps, x_vec, v_vec, masses, couplings, alphas, friction, dt, kT, U0):
+    """
+    Integrator for a Markovian Embedding with exponentially
+    decaying memory kernels, characterized by friction gamma[i]
+    and memory time tgammas[i]. Uses spline rep from pot_edges
+    and amatrix. Restarts sim from pos x0 and velocitiy v
+    and position of the overdamped orth. dof at R.
+    """
+
+    # relevant constants
+    nvars = len(x_vec)
+    xi_factor = np.zeros(nvars)
+    xi = np.zeros(nvars)
+    for y in range(1, nvars):
+        xi_factor[y] = sqrt(2 * kT / friction[y] * dt)
+
+    mass = masses[0] 
+    
+    # runge kutta step factors
+    RK = np.array([0.5, 1.])
+
+    # arrays to store temp data
+    vars = np.zeros((3, nvars))
+    vs = np.zeros(3)
+    vars[0] = x_vec
+    vs[0] = v_vec[0]
+
+    k = np.zeros((2, nvars))
+    kv = np.zeros(2)
+    
+    # trajectory array
+    x = np.zeros(nsteps)
+    v = np.zeros(nsteps)
+
+    for step in range(nsteps):
+        # draw random force
+        xi[1:] = np.random.normal(0., 1., nvars - 1)
+        # runge kutta steps
+        for rk in range(2):
+            ft = force(vars[rk], couplings, alphas, U0, nvars)
+            k[rk, 0] = dt * vs[rk]
+            kv[rk] = (dt * (ft[0]
+            - friction[0] * vs[rk]) + xi_factor[0] * xi[0]) / mass
+            # orhtogonal degrees of freedom
+            for y in range(1, nvars):
+                k[rk, y] = (dt * ft[y] / friction[y]
+                + xi_factor[y]*xi[y])
+                vars[rk + 1, y] = vars[0, y] + RK[rk] * k[rk, y]
+            # variable of interest
+            vars[rk + 1, 0] = vars[0, 0] + RK[rk] * k[rk, 0]
+            vs[rk + 1] = vs[0] + RK[rk] * kv[rk]
+        vars[0] = vars[2]
+        vs[0] = vs[2]
+
+        x[step] = vars[0, 0]
+        v[step] = vs[0]
+
+    x_vec = vars[0]
+    v_vec[0] = vs[0]
+
+    return x, v, x_vec, v_vec
+
+
+@njit()
 def Runge_Kutta_integrator(
     nsteps, x_vec, v_vec, masses, couplings, alphas, friction, dt, kT, U0):
     """
