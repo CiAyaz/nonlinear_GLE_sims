@@ -1,2 +1,3 @@
 import NL_GLE_sims.tools as tools
+import NL_GLE_sims.velocity_coupling_tools as velocity_coupling_tools
 from NL_GLE_sims.NL_GLE_sims_class import NL_GLE_sims
