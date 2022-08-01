@@ -353,14 +353,19 @@ class NL_GLE_sims():
     def memory_linear_friction(self, x, t):
         if not self.aux_var == "overdamped":
             if not self.non_local:
-                funcs = [dalpha1_dx, dalpha2_dx]
-                taus = 2 * self.masses[1:] / self.gammas[1:]
-                nus = np.sqrt(2 * self.coupling_ks * taus / self.gammas[1:] - 1)
-                ft =  (self.coupling_ks * np.exp(-t / taus) * (np.cos(nus * t / taus)
-                        + np.sin(nus * t / taus) / nus) / self.masses[0])
-                memory = 0.
-                for index, func in enumerate(funcs):
-                    memory += func(x, self.alphas[index]) ** 2 * ft[index]
+                if not self.vel_coupling:
+                    funcs = [dalpha1_dx, dalpha2_dx]
+                    taus = 2 * self.masses[1:] / self.gammas[1:]
+                    nus = np.sqrt(2 * self.coupling_ks * taus / self.gammas[1:] - 1)
+                    ft =  (self.coupling_ks * np.exp(-t / taus) * (np.cos(nus * t / taus)
+                            + np.sin(nus * t / taus) / nus) / self.masses[0])
+                    memory = 0.
+                    for index, func in enumerate(funcs):
+                        memory += func(x, self.alphas[index]) ** 2 * ft[index]
+                else:
+                    tau = self.masses[1] / self.gammas[1,1]
+                    ft =  (self.gammas[0,1] * np.exp(-t / tau) / self.masses[0])
+                    memory = sigma21(x, self.gammas) * ft
             else:
                 taus = 2 * self.masses[1:] / self.gammas[1:]
                 nus = np.sqrt(2 * self.coupling_ks * taus / self.gammas[1:] - 1)
