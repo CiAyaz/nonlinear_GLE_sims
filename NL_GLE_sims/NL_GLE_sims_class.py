@@ -32,7 +32,7 @@ class NL_GLE_sims():
     def __init__(self,
         gammas, 
         masses,
-        coupling_ks,
+        coupling_ks = None,
         alphas = None, 
         dt = 0.01,
         traj_length = int(1e6), 
@@ -110,6 +110,9 @@ class NL_GLE_sims():
                 raise ShapeError("Masses must have length 2!")
             self.gammas = np.insert(self.gammas, 2, 0.)
             self.gammas = self.gammas.reshape((2,2))
+            FDT = 4 * self.gammas[0,0] * self.gammas[1,1]
+            if FDT <= self.gammas[0,1] ** 2:
+                raise ValueError("FDT not fulfilled!")
 
     def gen_initial_values(self):
         if not self.vel_coupling:
