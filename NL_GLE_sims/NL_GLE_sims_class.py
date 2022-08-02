@@ -60,6 +60,7 @@ class NL_GLE_sims():
         self.U0 = U0 * self.kT
         self.nbins = nbins
         self.hist_range = hist_range
+        self.histogram = np.zeros(self.nbins)
         self.plot = plot
         self.save = save
         self.path_to_save = path_to_save
@@ -364,8 +365,8 @@ class NL_GLE_sims():
                         memory += func(x, self.alphas[index]) ** 2 * ft[index]
                 else:
                     tau = self.masses[1] / self.gammas[1,1]
-                    ft =  (self.gammas[0,1] * np.exp(-t / tau) / self.masses[0])
-                    memory = sigma21(x, self.gammas) * ft
+                    ft =  -(self.gammas[0,1] * np.exp(-t / tau) / self.masses[0] / self.masses[1])
+                    memory = gamma21(x) * ft
             else:
                 taus = 2 * self.masses[1:] / self.gammas[1:]
                 nus = np.sqrt(2 * self.coupling_ks * taus / self.gammas[1:] - 1)
@@ -384,37 +385,60 @@ class NL_GLE_sims():
         return memory
         
     def hybrid_GammaL(self, t):
-        funcs = [dalpha1_dx, dalpha2_dx]
-        taus = self.gammas[1:] / self.coupling_ks
-        ft =  (self.coupling_ks * np.exp(-t / taus) / self.masses[0])
-        pdf_pos = np.linspace(-3,3,1000)
-        pdf = np.exp(-PMF(pdf_pos, self.U0) / self.kT)
-        pdf_norm = np.trapz(pdf, pdf_pos)
-        pdf /= pdf_norm
-        averages = []
-        for index,func in enumerate(funcs):
-            averages.append(np.trapz(pdf * func(pdf_pos, self.alphas[index]) ** 2, pdf_pos))
-        memory = 0.
-        for index, func in enumerate(funcs):
-            memory += averages[index]  * ft[index]
+        if not self.vel_coupling:
+            funcs = [dalpha1_dx, dalpha2_dx]
+            taus = self.gammas[1:] / self.coupling_ks
+            ft =  (self.coupling_ks * np.exp(-t / taus) / self.masses[0])
+            pdf_pos = np.linspace(-3,3,1000)
+            pdf = np.exp(-PMF(pdf_pos, self.U0) / self.kT)
+            pdf_norm = np.trapz(pdf, pdf_pos)
+            pdf /= pdf_norm
+            averages = []
+            for index,func in enumerate(funcs):
+                averages.append(np.trapz(pdf * func(pdf_pos, self.alphas[index]) ** 2, pdf_pos))
+            memory = 0.
+            for index, func in enumerate(funcs):
+                memory += averages[index]  * ft[index]
+        else:
+            tau = self.masses[1] / self.gammas[1,1]
+            ft =  -(self.gammas[0,1] * np.exp(-t / tau) / self.masses[0] / self.masses[1])
+            pdf_pos = np.linspace(-3,3,1000)
+            pdf = np.exp(-PMF(pdf_pos, self.U0) / self.kT)
+            pdf_norm = np.trapz(pdf, pdf_pos)
+            pdf /= pdf_norm
+            average = np.trapz(pdf * gamma21(pdf_pos), pdf_pos)
+            memory = average  * ft
         
         return memory
 
     def hybrid_D(self, x, t):
-        funcs = [dalpha1_dx, dalpha2_dx]
-        taus = self.gammas[1:] / self.coupling_ks
-        ft =  (self.kT * self.gammas[1:] * (np.exp(-t / taus)-1) / self.masses[0] ** 2)
-        pdf_pos = np.linspace(-3,3,1000)
-        pdf = np.exp(-PMF(pdf_pos, self.U0) / self.kT)
-        pdf_norm = np.trapz(pdf, pdf_pos)
-        pdf /= pdf_norm
-        averages = []
-        for index,func in enumerate(funcs):
-            averages.append(np.trapz(pdf * func(pdf_pos, self.alphas[index]) ** 2, pdf_pos))
-        memory = 0.
-        for index, func in enumerate(funcs):
-            memory += (func(x, self.alphas[index]) ** 2 - averages[index])  * ft[index]
-        
+        if not self.vel_coupling:
+            funcs = [dalpha1_dx, dalpha2_dx]
+            taus = self.gammas[1:] / self.coupling_ks
+            ft =  (self.kT * self.gammas[1:] * (np.exp(-t / taus)-1) / self.masses[0] ** 2)
+            pdf_pos = np.linspace(-3,3,1000)
+            pdf = np.exp(-PMF(pdf_pos, self.U0) / self.kT)
+            pdf_norm = np.trapz(pdf, pdf_pos)
+            pdf /= pdf_norm
+            averages = []
+            for index,func in enumerate(funcs):
+                averages.append(np.trapz(pdf * func(pdf_pos, self.alphas[index]) ** 2, pdf_pos))
+            memory = 0.
+            for index, func in enumerate(funcs):
+                memory += (func(x, self.alphas[index]) ** 2 - averages[index])  * ft[index]
+        else:
+            tau1 = self.masses[1] / self.gammas[1,1]
+            tau2 = self.masses[0] / self.gammas[0,0]
+            ft =  (self.kT * self.gammas[0,1] * (np.exp(-t / tau1) - np.exp(-t / tau2) ))
+            ft /= (self.masses[0] ** 2 * self.masses[1])
+            ft /= (1 / tau1 - 1 / tau2)
+            pdf_pos = np.linspace(-3,3,1000)
+            pdf = np.exp(-PMF(pdf_pos, self.U0) / self.kT)
+            pdf_norm = np.trapz(pdf, pdf_pos)
+            pdf /= pdf_norm
+            average = np.trapz(pdf * gamma21(pdf_pos), pdf_pos)
+            memory = (gamma21(x) - average)  * ft
+
         return memory
 
 
