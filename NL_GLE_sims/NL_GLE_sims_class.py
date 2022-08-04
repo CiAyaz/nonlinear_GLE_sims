@@ -25,7 +25,7 @@ class NL_GLE_sims():
     integrator: string, if auxiliary_var is underdamped, then
                 "BAOAB" or "leapfrog"
                         if auxiliary_var is overdamped, then
-                "RK" or "leapfrogEuler".
+                "4th_RK" or "2nd_RK".
     non_local: bool, set True if you want non-local coupling.
     """
 
@@ -45,7 +45,7 @@ class NL_GLE_sims():
         save = False,
         path_to_save = './',
         auxiliary_var = "underdamped",
-        integrator = 'leap_frog',
+        integrator = 'leapfrog',
         non_local = False,
         velocity_coupling = False
         ):
@@ -261,29 +261,10 @@ class NL_GLE_sims():
 
             elif self.aux_var == "overdamped":
                 print("Overdamped coupling")
-                if self.integrator == "RK":
+                if self.integrator == "4th_RK":
                     print('Integrating using 4-th order Runge-Kutta')
                     for trj in range(self.number_trjs):
                         self.x, self.v, self.x_vec, self.v_vec = Runge_Kutta_integrator(
-                            self.trj_len,
-                            self.x_vec,
-                            self.v_vec,
-                            self.masses, 
-                            self.coupling_ks,
-                            self.alphas,
-                            self.gammas, 
-                            self.dt,
-                            self.kT,
-                            self.U0)
-                        self.compute_distribution()
-                        if self.save:
-                            np.save(self.path_to_save + 'traj_'+str(trj), self.x)
-                            np.save(self.path_to_save + 'vel_'+str(trj), self.v)
-
-                elif self.integrator == "leapfrogEuler":
-                    print('Integrating using leapfrog-Euler')
-                    for trj in range(self.number_trjs):
-                        self.x, self.v, self.x_vec, self.v_vec = leapfrog_Euler_integrator(
                             self.trj_len,
                             self.x_vec,
                             self.v_vec,
@@ -460,8 +441,8 @@ class NL_GLE_sims():
         return memory
     
 
-    def memory_function(self, x, t, gle = "hybridGLE", kernel = "GammaL"):
-        if gle == "hybridGLE":
+    def memory_function(self, x, t, gle = "HybridGle", kernel = "GammaL"):
+        if gle == "HybridGle":
             if kernel == "GammaL":
                 memory_vec = np.vectorize(self.hybrid_GammaL)
                 return(memory_vec(t))
