@@ -72,6 +72,9 @@ class NL_GLE_sims():
         self.v_vec = np.array([])
 
     def parse_input(self):
+        if self.path_to_save[-1] is not "/":
+            self.path_to_save += "/"
+
         for input in [self.gammas, self.masses]:
             if not isinstance(input, (np.ndarray, list)):
                 raise TypeError('Give gammas and masses as list of scalars or numpy.ndarray!')
@@ -218,6 +221,7 @@ class NL_GLE_sims():
                             self.U0)
                         self.compute_distribution()
                         if self.save:
+                            print(f"saving output files in {self.path_to_save}")
                             np.save(self.path_to_save + 'traj_'+str(trj), self.x)
                             np.save(self.path_to_save + 'vel_'+str(trj), self.v)
 
@@ -238,6 +242,7 @@ class NL_GLE_sims():
                                 self.U0)
                             self.compute_distribution()
                             if self.save:
+                                print(f"saving output files in {self.path_to_save}")
                                 np.save(self.path_to_save + 'traj_'+str(trj), self.x)
                                 np.save(self.path_to_save + 'vel_'+str(trj), self.v)
                     elif self.integrator == "leapfrog":
@@ -256,6 +261,7 @@ class NL_GLE_sims():
                                 self.U0)
                             self.compute_distribution()
                             if self.save:
+                                print(f"saving output files in {self.path_to_save}")
                                 np.save(self.path_to_save + 'traj_'+str(trj), self.x)
                                 np.save(self.path_to_save + 'vel_'+str(trj), self.v)
 
@@ -277,6 +283,7 @@ class NL_GLE_sims():
                             self.U0)
                         self.compute_distribution()
                         if self.save:
+                            print(f"saving output files in {self.path_to_save}")
                             np.save(self.path_to_save + 'traj_'+str(trj), self.x)
                             np.save(self.path_to_save + 'vel_'+str(trj), self.v)
 
@@ -296,6 +303,7 @@ class NL_GLE_sims():
                             self.U0)
                         self.compute_distribution()
                         if self.save:
+                            print(f"saving output files in {self.path_to_save}")
                             np.save(self.path_to_save + 'traj_'+str(trj), self.x)
                             np.save(self.path_to_save + 'vel_'+str(trj), self.v)
 
@@ -315,6 +323,7 @@ class NL_GLE_sims():
                     self.U0)
                 self.compute_distribution()
                 if self.save:
+                    print(f"saving output files in {self.path_to_save}")
                     np.save(self.path_to_save + 'traj_'+str(trj), self.x)
                     np.save(self.path_to_save + 'vel_'+str(trj), self.v)
 
@@ -339,8 +348,14 @@ class NL_GLE_sims():
                     funcs = [dalpha1_dx, dalpha2_dx]
                     taus = 2 * self.masses[1:] / self.gammas[1:]
                     nus = np.sqrt(2 * self.coupling_ks * taus / self.gammas[1:] - 1)
-                    ft =  (self.coupling_ks * np.exp(-t / taus) * (np.cos(nus * t / taus)
-                            + np.sin(nus * t / taus) / nus) / self.masses[0])
+                    if not any(nus) == 0:
+                        ft =  (self.coupling_ks * np.exp(-t / taus) * (np.cos(nus * t / taus)
+                                + np.sin(nus * t / taus) / nus) / self.masses[0])
+                    else:
+                        ft = self.coupling_ks * np.exp(-t / taus / 2) / self.masses[0]
+                        non_zero_inds = np.nonzero(nus)[0]
+                        ft[non_zero_inds] *= (np.cos(nus[non_zero_inds] * t / taus[non_zero_inds]) 
+                        + np.sin(nus[non_zero_inds] * t / taus[non_zero_inds]) / nus[non_zero_inds])
                     memory = 0.
                     for index, func in enumerate(funcs):
                         memory += func(x, self.alphas[index]) ** 2 * ft[index]
