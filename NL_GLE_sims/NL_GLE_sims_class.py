@@ -177,7 +177,7 @@ class NL_GLE_sims():
                 print('memory times = %.3g,   %.3g'%(self.mem_time[0], self.mem_time[1]))
                 print('oscillation freq. = %.3g,   %.3g'%(self.freq[0], self.freq[1]))
             else:
-                epsilon = self.masses[1] / self.masses[0]
+                epsilon = np.sqrt(self.masses[1] / self.masses[0])
                 self.mem_time = self.masses[1] / self.gammas[1,1]
                 print(f'epsilon = {epsilon:.3f}')
                 print(f'memory time = {self.mem_time:.3f}')
@@ -197,6 +197,14 @@ class NL_GLE_sims():
                         f.write('memory times = %.3g, %.3g'%(self.mem_time[0], self.mem_time[1]))
                         f.write('\n')
                         f.write('oscillation freq. = %.3g, %.3g'%(self.freq[0], self.freq[1]))
+                        f.write('\n')
+                        f.write(f"time step = {self.dt}")
+                        f.write('\n')
+                        f.write(f"gammas = {self.gammas}")
+                        f.write('\n')
+                        f.write(f"masses = {self.masses}")
+                        f.write('\n')
+                        f.write(f"coupling ks = {self.coupling_ks}")
         else:
             with open(self.path_to_save+'info.txt', 'a') as f:
                 f.write(f'memory times = {self.mem_time[0]:.3f},    {self.mem_time[1]:.3f}')
@@ -425,9 +433,9 @@ class NL_GLE_sims():
         else:
             tau1 = self.masses[1] / self.gammas[1,1]
             tau2 = self.masses[0] / self.gammas[0,0]
-            ft =  (self.kT * self.gammas[0,1] * (np.exp(-t / tau1) - np.exp(-t / tau2) ))
-            ft /= (self.masses[0] ** 2 * self.masses[1])
-            ft /= (1 / tau1 - 1 / tau2)
+            ft =  (self.kT * self.gammas[0,1] * (np.exp(-t / tau2) - np.exp(- t / tau1) ))
+            ft /= (self.masses[0] **2 * self.masses[1])
+            ft /= (1/tau1 - 1/tau2)
             pdf_pos = np.linspace(-3,3,1000)
             pdf = np.exp(-PMF(pdf_pos, self.U0) / self.kT)
             pdf_norm = np.trapz(pdf, pdf_pos)
